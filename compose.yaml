@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: techledger
+      POSTGRES_USER: techledger
+      POSTGRES_PASSWORD: localdemo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U techledger -d techledger"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://techledger:localdemo@db:5432/techledger
+      WEB_ORIGIN: http://localhost:3100
+      SOURCE_TIMEOUT_SECONDS: ${SOURCE_TIMEOUT_SECONDS:-15}
+      SOURCE_MAX_BYTES: ${SOURCE_MAX_BYTES:-2097152}
+    command: sh -c "alembic upgrade head && uvicorn techledger.api:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://techledger:localdemo@db:5432/techledger
+      SOURCE_TIMEOUT_SECONDS: ${SOURCE_TIMEOUT_SECONDS:-15}
+      SOURCE_MAX_BYTES: ${SOURCE_MAX_BYTES:-2097152}
+      MODEL_BASE_URL: ${MODEL_BASE_URL:-}
+      MODEL_NAME: ${MODEL_NAME:-}
+      RESEARCH_MAX_EVIDENCE: ${RESEARCH_MAX_EVIDENCE:-6}
+      RESEARCH_MODEL_TIMEOUT_SECONDS: ${RESEARCH_MODEL_TIMEOUT_SECONDS:-20}
+      RESEARCH_MAX_OUTPUT_TOKENS: ${RESEARCH_MAX_OUTPUT_TOKENS:-256}
+    command: python -m techledger.worker
+    depends_on:
+      api:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "3100:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:

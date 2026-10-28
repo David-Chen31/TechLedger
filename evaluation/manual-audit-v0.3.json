@@ -1,0 +1,19 @@
+{
+  "dataset": "frozen-v0.3.json",
+  "retrieval_report": "report-bm25-v0.3.json",
+  "reviewer": "AI development agent, manual citation inspection",
+  "reviewed_at": "2026-10-28",
+  "criterion": "Top1 fixed-snapshot chunk directly supports the question's expected capability; negative cases return no hits",
+  "cases": [
+    {"id":"fact-lg-01","top1_semantic_support":true,"note":"The cited chunk directly lists durable execution and persistence."},
+    {"id":"fact-lg-02","top1_semantic_support":true,"note":"The cited chunk describes human oversight and modifying agent state."},
+    {"id":"fact-lg-03","top1_semantic_support":true,"note":"The cited chunk describes mixing deterministic and agentic steps."},
+    {"id":"fact-ca-01","top1_semantic_support":true,"note":"The cited chunk describes Flows state management and event-driven execution."},
+    {"id":"fact-ca-02","top1_semantic_support":true,"note":"The cited chunk describes Crews and agent collaboration."},
+    {"id":"fact-ca-03","top1_semantic_support":true,"note":"The cited chunk explicitly describes conditional logic, loops and branching."},
+    {"id":"paraphrase-lg-01","top1_semantic_support":false,"note":"The top chunk has the correct source but does not itself establish resuming after interruption."},
+    {"id":"paraphrase-ca-01","top1_semantic_support":true,"note":"The cited chunk describes a Crew working within a Flow."},
+    {"id":"negative-01","abstained":true,"note":"No hit returned."},
+    {"id":"negative-02","abstained":true,"note":"No hit returned."}
+  ]
+}

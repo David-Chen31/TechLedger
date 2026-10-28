@@ -1,0 +1,12 @@
+# Copy this file to compose.override.yaml after creating .deepseek_api_key.
+# Compose loads compose.override.yaml automatically; only worker receives the secret.
+services:
+  worker:
+    environment:
+      MODEL_API_KEY_FILE: /run/secrets/deepseek_api_key
+    secrets:
+      - deepseek_api_key
+
+secrets:
+  deepseek_api_key:
+    file: ./.deepseek_api_key

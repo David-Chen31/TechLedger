@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "theme": "Python Agent 编排的证据规划对照",
+  "status": "curated_holdout_unfrozen",
+  "source_checked_at": "2026-10-28",
+  "cases": [
+    {
+      "id": "holdout-01",
+      "question": "运行被打断后，官方概览是否描述了恢复能力？",
+      "constraints": "必须有恢复的明确证据",
+      "candidates": ["LangGraph"],
+      "expected_source_urls": ["https://docs.langchain.com/oss/python/langgraph/overview"],
+      "expected_evidence": [{"source_url": "https://docs.langchain.com/oss/python/langgraph/overview", "phrase": "persist through failures"}]
+    },
+    {
+      "id": "holdout-02",
+      "question": "人能否检查并修改运行中的 agent 状态？",
+      "constraints": "需要人工干预的明确依据",
+      "candidates": ["LangGraph"],
+      "expected_source_urls": ["https://docs.langchain.com/oss/python/langgraph/overview"],
+      "expected_evidence": [{"source_url": "https://docs.langchain.com/oss/python/langgraph/overview", "phrase": "human oversight"}]
+    },
+    {
+      "id": "holdout-03",
+      "question": "如何在同一执行图中结合写死的步骤与模型驱动步骤？",
+      "constraints": "需要确定性流程和 agentic 步骤混用",
+      "candidates": ["LangGraph"],
+      "expected_source_urls": ["https://docs.langchain.com/oss/python/langgraph/overview"],
+      "expected_evidence": [{"source_url": "https://docs.langchain.com/oss/python/langgraph/overview", "phrase": "Mix deterministic and agentic steps"}]
+    },
+    {
+      "id": "holdout-04",
+      "question": "工作流是否能按条件走不同路径？",
+      "constraints": "必须有条件分支",
+      "candidates": ["CrewAI"],
+      "expected_source_urls": ["https://docs.crewai.com/en/introduction"],
+      "expected_evidence": [{"source_url": "https://docs.crewai.com/en/introduction", "phrase": "conditional logic, loops, and branching"}]
+    },
+    {
+      "id": "holdout-05",
+      "question": "流程数据能否跨多次执行保留？",
+      "constraints": "必须说明状态持久化",
+      "candidates": ["CrewAI"],
+      "expected_source_urls": ["https://docs.crewai.com/en/introduction"],
+      "expected_evidence": [{"source_url": "https://docs.crewai.com/en/introduction", "phrase": "Persist data across steps and executions"}]
+    },
+    {
+      "id": "holdout-06",
+      "question": "如何比较事件驱动控制与确定性步骤混用？",
+      "constraints": "两种能力各需官方依据",
+      "candidates": ["CrewAI", "LangGraph"],
+      "expected_source_urls": ["https://docs.crewai.com/en/introduction", "https://docs.langchain.com/oss/python/langgraph/overview"],
+      "expected_evidence": [
+        {"source_url": "https://docs.crewai.com/en/introduction", "phrase": "event-driven workflows"},
+        {"source_url": "https://docs.langchain.com/oss/python/langgraph/overview", "phrase": "deterministic and agentic steps"}
+      ]
+    }
+  ]
+}
