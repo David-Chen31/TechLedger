@@ -19,6 +19,9 @@ CAPABILITY_QUERIES = (
     ("branching", ("分支", "条件", "branch", "conditional"), "conditional logic loops branching"),
     ("deterministic", ("确定性", "deterministic"), "deterministic agentic steps"),
     ("event_driven", ("事件驱动", "event-driven", "event driven"), "event-driven workflows"),
+    ("streaming", ("流式", "streaming", "stream"), "streaming"),
+    ("long_term_memory", ("长期记忆", "跨会话", "long-term memory", "across sessions"), "long-term memory across sessions"),
+    ("crew_collaboration", ("团队", "协作", "crew", "多角色"), "Crews collaborative agents"),
 )
 
 MAX_REPAIR_SEARCHES = 6
@@ -50,7 +53,7 @@ def _research_plan(db: Session, question: str, constraints: str, candidates: lis
         for candidate in candidates[:3]:
             source = source_by_candidate[candidate]
             if source:
-                add(f"{candidate} {query}", source.id, 1, "initial")
+                add(query, source.id, 2, "initial")
     if not selected:
         for candidate in candidates[:3]:
             add(candidate, source_by_candidate[candidate].id if source_by_candidate[candidate] else None, 2, "initial")

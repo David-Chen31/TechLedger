@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "theme": "三类漏检改进后的独立问法验证",
+  "status": "curated_unfrozen",
+  "cases": [
+    {"id": "ind-stream-01", "question": "运行中的代理图能实时向界面推送执行信息吗？", "constraints": "需要流式输出能力", "candidates": ["LangGraph"], "expected_source_urls": ["https://docs.langchain.com/oss/python/langgraph/overview"], "expected_evidence": [{"source_url": "https://docs.langchain.com/oss/python/langgraph/overview", "phrase": "durable execution, streaming"}]},
+    {"id": "ind-stream-02", "question": "框架概览是否明确列出连续输出功能？", "constraints": "必须有 streaming 依据", "candidates": ["LangGraph"], "expected_source_urls": ["https://docs.langchain.com/oss/python/langgraph/overview"], "expected_evidence": [{"source_url": "https://docs.langchain.com/oss/python/langgraph/overview", "phrase": "streaming, human-in-the-loop"}]},
+    {"id": "ind-memory-01", "question": "代理是否能记住不同会话之间的信息？", "constraints": "要求跨会话记忆", "candidates": ["LangGraph"], "expected_source_urls": ["https://docs.langchain.com/oss/python/langgraph/overview"], "expected_evidence": [{"source_url": "https://docs.langchain.com/oss/python/langgraph/overview", "phrase": "long-term memory across sessions"}]},
+    {"id": "ind-memory-02", "question": "概览是否把长时记忆列为内置能力？", "constraints": "关注 long-term memory", "candidates": ["LangGraph"], "expected_source_urls": ["https://docs.langchain.com/oss/python/langgraph/overview"], "expected_evidence": [{"source_url": "https://docs.langchain.com/oss/python/langgraph/overview", "phrase": "Comprehensive memory"}]},
+    {"id": "ind-crew-01", "question": "工作流里能否交给一组智能体处理复杂任务？", "constraints": "需要团队协作执行", "candidates": ["CrewAI"], "expected_source_urls": ["https://docs.crewai.com/en/introduction"], "expected_evidence": [{"source_url": "https://docs.crewai.com/en/introduction", "phrase": "trigger a Crew to tackle a complex problem"}]},
+    {"id": "ind-crew-02", "question": "官方如何描述 Crews 与 Flows 的分工？", "constraints": "关注多角色协作", "candidates": ["CrewAI"], "expected_source_urls": ["https://docs.crewai.com/en/introduction"], "expected_evidence": [{"source_url": "https://docs.crewai.com/en/introduction", "phrase": "collaborative intelligence of Crews"}]}
+  ]
+}

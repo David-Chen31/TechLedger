@@ -162,7 +162,7 @@ def test_repair_pass_is_bounded_and_records_missing_capability(session_factory, 
         calls = []
         def fake_search(_db, query, limit, mode, source_id=None):
             calls.append((query, limit, source_id))
-            if limit == 1:
+            if len(calls) == 1:
                 return [{"chunk_id": "initial", "source_id": source.id, "snippet": "CrewAI introduction"}]
             return [{"chunk_id": "repair", "source_id": source.id,
                      "snippet": "Flows provide event-driven workflows."}]
