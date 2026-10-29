@@ -2,7 +2,7 @@ import json
 import httpx
 
 from techledger.models import DecisionCard, ResearchRun
-from techledger.research import _collect_evidence, _model_summary, process_one_research
+from techledger.research import _collect_evidence, _model_summary, _research_plan, process_one_research
 
 
 def test_research_without_evidence_is_partial(client, session_factory, monkeypatch):
@@ -150,3 +150,25 @@ def test_capability_queries_cover_each_candidate(session_factory):
     assert any("persistence" in item["snippet"] for item in evidence)
     assert any("persist data" in item["snippet"] for item in evidence)
     assert any("human-in-the-loop" in query for query in queries)
+
+
+def test_repair_pass_is_bounded_and_records_missing_capability(session_factory, monkeypatch):
+    from techledger.models import Source
+    with session_factory() as db:
+        source = Source(url="https://docs.crewai.com/en/introduction", host="docs.crewai.com",
+                        review_status="approved", storage_policy="index_local")
+        db.add(source)
+        db.commit()
+        calls = []
+        def fake_search(_db, query, limit, mode, source_id=None):
+            calls.append((query, limit, source_id))
+            if limit == 1:
+                return [{"chunk_id": "initial", "source_id": source.id, "snippet": "CrewAI introduction"}]
+            return [{"chunk_id": "repair", "source_id": source.id,
+                     "snippet": "Flows provide event-driven workflows."}]
+        monkeypatch.setattr("techledger.research.search_chunks", fake_search)
+        plan = _research_plan(db, "是否支持事件驱动？", "需要事件驱动流程", ["CrewAI"])
+    assert len([call for call in plan["calls"] if call["stage"] == "repair"]) == 1
+    assert plan["repaired"] == [{"candidate": "CrewAI", "capability": "event_driven", "added": 1}]
+    assert plan["stop_reason"] == "coverage_met"
+    assert plan["unresolved"] == []

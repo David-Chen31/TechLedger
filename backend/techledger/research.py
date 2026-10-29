@@ -18,7 +18,76 @@ CAPABILITY_QUERIES = (
     ("state", ("状态", "state"), "state management persist data"),
     ("branching", ("分支", "条件", "branch", "conditional"), "conditional logic loops branching"),
     ("deterministic", ("确定性", "deterministic"), "deterministic agentic steps"),
+    ("event_driven", ("事件驱动", "event-driven", "event driven"), "event-driven workflows"),
 )
+
+MAX_REPAIR_SEARCHES = 6
+
+
+def _research_plan(db: Session, question: str, constraints: str, candidates: list[str]) -> dict:
+    """One bounded evidence repair pass; coverage means retrieval presence, not fact verification."""
+    request = (question + " " + constraints).lower()
+    features = [(name, query) for name, triggers, query in CAPABILITY_QUERIES if any(trigger in request for trigger in triggers)][:3]
+    sources = list(db.scalars(select(Source).where(Source.review_status == "approved", Source.storage_policy == "index_local")))
+    selected = []
+    seen = set()
+    calls = []
+    source_by_candidate = {candidate: next((source for source in sources if candidate.lower().replace(" ", "") in source.url.lower().replace(" ", "")), None)
+                           for candidate in candidates[:3]}
+
+    def add(query: str, source_id: str | None, limit: int, stage: str) -> list[dict]:
+        hits = search_chunks(db, query, limit, "bm25", source_id)
+        calls.append({"stage": stage, "query": query, "source_id": source_id, "hit_count": len(hits)})
+        new = []
+        for hit in hits:
+            if hit["chunk_id"] not in seen:
+                seen.add(hit["chunk_id"])
+                new.append(hit)
+                selected.append(hit)
+        return new
+
+    for name, query in features:
+        for candidate in candidates[:3]:
+            source = source_by_candidate[candidate]
+            if source:
+                add(f"{candidate} {query}", source.id, 1, "initial")
+    if not selected:
+        for candidate in candidates[:3]:
+            add(candidate, source_by_candidate[candidate].id if source_by_candidate[candidate] else None, 2, "initial")
+
+    missing = []
+    for candidate in candidates[:3]:
+        source = source_by_candidate[candidate]
+        if source is None or not any(hit["source_id"] == source.id for hit in selected):
+            missing.append({"candidate": candidate, "capability": "any", "query": candidate, "source_id": source.id if source else None})
+        for name, query in features:
+            terms = [term for term in query.lower().split() if len(term) >= 4 and term not in {"data", "human"}]
+            if source is None or not any(hit["source_id"] == source.id and any(term in hit["snippet"].lower() for term in terms) for hit in selected):
+                missing.append({"candidate": candidate, "capability": name, "query": query, "source_id": source.id if source else None})
+
+    repaired = []
+    for gap in missing[:MAX_REPAIR_SEARCHES]:
+        if len(selected) >= RESEARCH_MAX_EVIDENCE or gap["source_id"] is None:
+            continue
+        new = add(gap["query"], gap["source_id"], 3, "repair")
+        if new:
+            repaired.append({"candidate": gap["candidate"], "capability": gap["capability"], "added": len(new)})
+
+    evidence = selected[:RESEARCH_MAX_EVIDENCE]
+    unresolved = []
+    for candidate in candidates[:3]:
+        source = source_by_candidate[candidate]
+        if source is None or not any(hit["source_id"] == source.id for hit in evidence):
+            unresolved.append({"candidate": candidate, "capability": "any"})
+        for name, query in features:
+            terms = [term for term in query.lower().split() if len(term) >= 4 and term not in {"data", "human"}]
+            if source is None or not any(hit["source_id"] == source.id and any(term in hit["snippet"].lower() for term in terms) for hit in evidence):
+                unresolved.append({"candidate": candidate, "capability": name})
+    return {"evidence": evidence, "calls": calls, "repaired": repaired, "unresolved": unresolved,
+            "stop_reason": "evidence_limit" if len(selected) >= RESEARCH_MAX_EVIDENCE and unresolved else
+                           "repair_limit" if len(missing) > MAX_REPAIR_SEARCHES and unresolved else
+                           "insufficient_evidence" if unresolved else "coverage_met",
+            "evidence_input_chars": sum(len(hit["snippet"][:220]) for hit in evidence)}
 
 
 def _provider_configured() -> bool:
@@ -28,31 +97,8 @@ def _provider_configured() -> bool:
 
 
 def _collect_evidence(db: Session, question: str, constraints: str, candidates: list[str]) -> tuple[list[dict], list[str]]:
-    request = (question + " " + constraints).lower()
-    features = [(name, query) for name, triggers, query in CAPABILITY_QUERIES if any(trigger in request for trigger in triggers)]
-    sources = list(db.scalars(select(Source).where(Source.review_status == "approved", Source.storage_policy == "index_local")))
-    evidence: list[dict] = []
-    seen: set[str] = set()
-    queries: list[str] = []
-    def add(query: str, source_id: str | None, limit: int) -> None:
-        queries.append(query)
-        for item in search_chunks(db, query, limit, "bm25", source_id):
-            if item["chunk_id"] not in seen:
-                seen.add(item["chunk_id"])
-                evidence.append(item)
-
-    if features:
-        for _, feature_query in features[:3]:
-            for candidate in candidates[:3]:
-                matching = [source for source in sources if candidate.lower().replace(" ", "") in source.url.lower().replace(" ", "")]
-                for source in matching[:1]:
-                    add(f"{candidate} {feature_query}", source.id, 1)
-    if len(evidence) < max(1, len(candidates)):
-        for candidate in candidates[:3]:
-            add(candidate, None, 2)
-    if len(evidence) < max(1, len(candidates)):
-        add(question, None, 5)
-    return evidence[:max(1, min(RESEARCH_MAX_EVIDENCE, 30))], queries
+    plan = _research_plan(db, question, constraints, candidates)
+    return plan["evidence"], [call["query"] for call in plan["calls"]]
 
 
 def _model_summary(question: str, constraints: str, candidates: list[str], evidence: list[dict]) -> tuple[str, dict]:
@@ -112,8 +158,13 @@ def process_one_research(db: Session) -> ResearchRun | None:
     started = time.monotonic()
     try:
         candidates = json.loads(run.candidates)
-        evidence, retrieval_queries = _collect_evidence(db, run.question, run.constraints, candidates)
-        db.add(RunEvent(run_id=run.id, stage="retrieved", detail_json=json.dumps({"count": len(evidence), "mode": "bm25", "queries": retrieval_queries})))
+        plan = _research_plan(db, run.question, run.constraints, candidates)
+        evidence = plan["evidence"]
+        for call in plan["calls"]:
+            db.add(RunEvent(run_id=run.id, stage="tool_call", detail_json=json.dumps(call, ensure_ascii=False)))
+        db.add(RunEvent(run_id=run.id, stage="retrieved", detail_json=json.dumps({"count": len(evidence), "mode": "bm25",
+            "repair_count": len([call for call in plan["calls"] if call["stage"] == "repair"]),
+            "unresolved": plan["unresolved"], "stop_reason": plan["stop_reason"]}, ensure_ascii=False)))
         db.commit()
         db.refresh(run)
         if run.status == "cancelled":
@@ -131,12 +182,13 @@ def process_one_research(db: Session) -> ResearchRun | None:
             return run
         result = {"question": run.question, "constraints": run.constraints,
                   "candidates": candidates, "summary": summary,
-                  "evidence": evidence, "claims": claims,
-                  "unknowns": ["来源不足，需人工补充资料"] if not claims else ["模型摘要尚未逐主张核验，请人工复核"],
+                  "evidence": evidence, "claims": claims, "retrieval_trace": {key: plan[key] for key in ("calls", "repaired", "unresolved", "stop_reason", "evidence_input_chars")},
+                  "unknowns": (["来源不足，需人工补充资料"] if not claims else ["模型摘要尚未逐主张核验，请人工复核"]) +
+                      [f"{gap['candidate']} 的 {gap['capability']} 能力缺少可识别证据" for gap in plan["unresolved"]],
                   "model_mode": "configured" if _provider_configured() else "fake",
                   "usage": usage, "duration_ms": round((time.monotonic() - started) * 1000)}
         run.result_json = json.dumps(result, ensure_ascii=False)
-        run.status = "completed" if claims else "partial"
+        run.status = "completed" if claims and not plan["unresolved"] else "partial"
         db.add(DecisionCard(run_id=run.id, content_json=run.result_json))
         db.add(RunEvent(run_id=run.id, stage="completed", detail_json=json.dumps({"evidence_count": len(evidence)})))
     except httpx.TimeoutException:
@@ -150,6 +202,18 @@ def process_one_research(db: Session) -> ResearchRun | None:
         run = db.get(ResearchRun, run.id)
         run.status = "failed"
         run.error_code = "model_rate_limited" if exc.response.status_code == 429 else "model_http_error"
+        db.add(RunEvent(run_id=run.id, stage="failed", detail_json=json.dumps({"code": run.error_code})))
+    except httpx.RequestError:
+        db.rollback()
+        run = db.get(ResearchRun, run.id)
+        run.status = "failed"
+        run.error_code = "model_network_error"
+        db.add(RunEvent(run_id=run.id, stage="failed", detail_json=json.dumps({"code": run.error_code})))
+    except ValueError as exc:
+        db.rollback()
+        run = db.get(ResearchRun, run.id)
+        run.status = "failed"
+        run.error_code = "model_output_truncated" if str(exc) == "model_output_truncated" else "research_failed"
         db.add(RunEvent(run_id=run.id, stage="failed", detail_json=json.dumps({"code": run.error_code})))
     except Exception:
         db.rollback()

@@ -32,7 +32,7 @@ type Citation = SearchHit & { text: string };
 type ResearchResult = {
   id: string; status: string; error_code: string | null; card_id: string | null; card_status: string | null;
   events: { stage: string; detail: Record<string, unknown>; at: string }[];
-  result: { question: string; summary: string; evidence: SearchHit[]; claims: { text: string; chunk_id: string }[]; unknowns: string[]; model_mode: string; usage: Record<string, number>; duration_ms: number } | null;
+  result: { question: string; summary: string; evidence: SearchHit[]; claims: { text: string; chunk_id: string }[]; unknowns: string[]; model_mode: string; usage: Record<string, number>; duration_ms: number; retrieval_trace?: { calls: { stage: string; query: string; hit_count: number }[]; repaired: { candidate: string; capability: string; added: number }[]; unresolved: { candidate: string; capability: string }[]; stop_reason: string; evidence_input_chars: number } } | null;
 };
 
 type Card = { id: string; status: string; content: { question: string; summary: string; evidence: SearchHit[] }; stale_source_ids: string[]; history: { action: string; note: string; at: string }[] };
@@ -406,6 +406,10 @@ export default function Home() {
           <div>{research.events?.map((event, index) => <p key={`${event.at}-${index}`}>{event.stage} · {new Date(event.at).toLocaleTimeString("zh-CN")}</p>)}</div>
           <p>{research.result?.summary ?? research.error_code}</p>
           {research.result && <p>耗时 {research.result.duration_ms} ms · Token：{research.result.usage.total_tokens ?? "未知"}</p>}
+          {research.result?.retrieval_trace && <details><summary>证据核查轨迹 · {research.result.retrieval_trace.calls.length} 次检索 · 停止原因：{research.result.retrieval_trace.stop_reason}</summary>
+            <p>送入模型的证据字符：{research.result.retrieval_trace.evidence_input_chars}（不等于 Token）</p>
+            {research.result.retrieval_trace.calls.map((call, index) => <p key={`${call.stage}-${index}`}>{call.stage === "repair" ? "补检索" : "初检索"} · {call.query} · 命中 {call.hit_count}</p>)}
+          </details>}
           {research.result?.claims.map((claim) => <div key={claim.chunk_id}><p>来源原文：{claim.text}</p><button type="button" onClick={() => void openCitation(claim.chunk_id)}>核对原文</button></div>)}
           {research.result?.unknowns.map((item) => <p key={item}>待核查：{item}</p>)}
           {research.result?.evidence.map((item) => <button key={item.chunk_id} type="button" onClick={() => void openCitation(item.chunk_id)}>{item.title} · {item.snapshot_sha256.slice(0, 10)}</button>)}
