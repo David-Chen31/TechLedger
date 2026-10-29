@@ -17,6 +17,7 @@
 本地演示现有两张由开发代理逐字核查并修订的决策卡；三次真实 DeepSeek 调用、Token 与审核决定见[模型审核记录](docs/model-review-v0.1.md)。来源使用依据见[来源审核记录](docs/source-review-v0.1.md)。这些记录不等同于独立用户研究。
 
 面试介绍与证据入口见[项目展示提纲](docs/portfolio-brief.md)。
+完整的产品流程、架构取舍、评测边界和面试讲法见[项目详细介绍](docs/project-guide.md)。独立开发者试用尚未进行，[试用模板](docs/user-study-kit.md)可用于后续记录。
 
 当前有界证据补检索会记录每次工具查询、缺失能力、证据字符数和停止原因；[演示及失败记录](docs/bounded-repair-demo-v0.1.md)显示新题 4 题仅 1 题覆盖目标片段。词面覆盖不是事实核验，仍需改进语义召回。
 
